@@ -20,6 +20,17 @@ fn main() {
 
     let stream_id = event_loop.build_output_stream(&device, &format).expect("Error in creating stream id");
 
+
+    // Beep Example
+    let sample_rate = format.sample_rate.0 as f32;
+    let mut sample_clock = 0f32;
+
+    // Produce a sinusoid of maximum amplitude.
+    let mut next_value = || {
+        sample_clock = (sample_clock + 1.0) % sample_rate;
+        (sample_clock * 440.0 * 2.0 * 3.141592 / sample_rate).sin()
+    };
+
     event_loop.play_stream(stream_id).expect("Error in play stream.");
     event_loop.run(move |_s_id, result|{
 
@@ -39,8 +50,13 @@ fn main() {
             StreamData::Output { buffer: UnknownTypeOutputBuffer::I16(mut _buffer) } => {
                 println!("Inside i16")
             },
-            StreamData::Output { buffer: UnknownTypeOutputBuffer::F32(mut _buffer) } => {
-                println!("Inside i32")
+            StreamData::Output { buffer: UnknownTypeOutputBuffer::F32(mut buffer) } => {
+                for sample in buffer.chunks_mut(format.channels as usize) {
+                    let value = next_value();
+                    for out in sample.iter_mut() {
+                        *out = value;
+                    }
+                }
             },
             _ => (),
         };
@@ -57,6 +73,8 @@ fn list_devices(host: &Host) {
 
 }
 
+
+// This was needed cause it was using the wrong / default sound card, which is probs the in built. Check /proc/asounds/cards
 fn custom_device(host: &Host) -> Device {
     let device = host.output_devices()
         .expect("Error")
